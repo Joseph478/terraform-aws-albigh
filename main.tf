@@ -283,21 +283,31 @@ resource "aws_launch_template" "template" {
 }
 
 resource "aws_autoscaling_group" "autoscaling_group" {
-  vpc_zone_identifier = var.subnets
-  desired_capacity   = 2
-  max_size           = 4
-  min_size           = 1
-  
+  vpc_zone_identifier           = var.subnets
+  desired_capacity              = 2
+  max_size                      = 4
+  min_size                      = 2
+  force_delete                  = true
   launch_template {
-    id      = aws_launch_template.template.id
-    version = "$Latest"
+    id                          = aws_launch_template.template.id
+    version                     = "$Latest"
   }
-  health_check_type = "EC2"
-  health_check_grace_period = 1000
+  health_check_type             = "EC2"
+  health_check_grace_period     = 1000
+  enabled_metrics               = [
+    "GroupMinSize",
+    "GroupMaxSize",
+    "GroupDesiredCapacity",
+    "GroupInServiceInstances",
+    "GroupPendingInstances",
+    "GroupStandbyInstances",
+    "GroupTerminatingInstances",
+    "GroupTotalInstances",
+  ]
   tag {
-    key                 = "AmazonECSManaged"
-    value               = true
-    propagate_at_launch = true
+    key                         = "AmazonECSManaged"
+    value                       = true
+    propagate_at_launch         = true
   }
 }
 
@@ -335,7 +345,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
     evaluation_periods = 2
     metric_name = "CPUUtilization" 
     namespace = "AWS/EC2"
-    period = 120
+    period = 60
     statistic = "Average"
     unit = "Percent"
     threshold = 70
@@ -352,10 +362,10 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
     evaluation_periods = 2
     metric_name = "CPUUtilization" 
     namespace = "AWS/EC2"
-    period = 120
+    period = 240
     statistic = "Average"
     unit = "Percent"
-    threshold = 30
+    threshold = 10
 
     dimensions = {
         AutoScalingGroupName = aws_autoscaling_group.autoscaling_group.name
@@ -371,7 +381,7 @@ resource "aws_cloudwatch_metric_alarm" "memory_high" {
     evaluation_periods = 2
     metric_name = "MemoryUtilization" 
     namespace = "AWS/EC2"
-    period = 120
+    period = 60
     statistic = "Average"
     unit = "Percent"
     threshold = 70
@@ -388,10 +398,10 @@ resource "aws_cloudwatch_metric_alarm" "memory_low" {
     evaluation_periods = 2
     metric_name = "MemoryUtilization" 
     namespace = "AWS/EC2"
-    period = 120
+    period = 240
     statistic = "Average"
     unit = "Percent"
-    threshold = 30 
+    threshold = 10 
 
     dimensions = {
         AutoScalingGroupName = aws_autoscaling_group.autoscaling_group.name
