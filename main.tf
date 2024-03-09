@@ -229,7 +229,7 @@ resource "aws_launch_template" "template" {
   # image_id      = "ami-00eb0dc604a8124fd"
 
   # Instance type for the EC2 instance
-  instance_type = "t3.small"
+  instance_type = "t3.medium"
 
   # SSH key pair name for connecting to the instance
   key_name = var.key_pair
@@ -246,9 +246,9 @@ resource "aws_launch_template" "template" {
       volume_type = "gp3"
     }
   }
-  instance_market_options {
-    market_type = "spot"
-  }
+  # instance_market_options {
+  #   market_type = "spot"
+  # }
   monitoring {
     enabled = true
   }
