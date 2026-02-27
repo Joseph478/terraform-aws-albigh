@@ -37,10 +37,21 @@ variable "key_pair" {
     type = string
 }
 variable "role_ec2" {
-    description = "EC2 Role"
-    type = string
+    default     = "ROLE_PRIMARY"
+    description = "EC2 instance profile role. Only used when launch_type = 'EC2'"
+    type        = string
 }
 variable "name_cluster_ecs" {
     description = "Name of the cluster"
-    type = string
+    type        = string
+}
+variable "launch_type" {
+    default     = "EC2"
+    description = "ECS launch type. Allowed values: 'EC2', 'FARGATE'"
+    type        = string
+
+    validation {
+        condition     = contains(["EC2", "FARGATE"], var.launch_type)
+        error_message = "launch_type must be 'EC2' or 'FARGATE'."
+    }
 }
