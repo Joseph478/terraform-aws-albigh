@@ -55,3 +55,14 @@ variable "launch_type" {
         error_message = "launch_type must be 'EC2' or 'FARGATE'."
     }
 }
+
+variable "type_project" {
+    default     = "laravel"
+    description = "Project type. Defines container port and target group port. Allowed values: 'laravel' (port 80), 'django' (port 8000)"
+    type        = string
+
+    validation {
+        condition     = contains(["laravel", "django"], var.type_project)
+        error_message = "type_project must be 'laravel' or 'django'."
+    }
+}

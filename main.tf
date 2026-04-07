@@ -1,5 +1,7 @@
 locals {
-    is_ec2 = var.launch_type == "EC2"
+    is_ec2    = var.launch_type == "EC2"
+    is_django = var.type_project == "django"
+    app_port  = local.is_django ? 8000 : 80
 }
 
 # ─── S3 para logs del ALB ────────────────────────────────────────────────────
@@ -81,12 +83,26 @@ resource "aws_security_group" "security_group_ec2" {
     description = local.is_ec2 ? "Allow inbound traffic to EC2 instances" : "Allow inbound traffic to Fargate tasks"
     vpc_id      = var.vpc_id
 
-    ingress {
-        description     = "Trafic HTTP from ALB"
-        from_port       = 80
-        to_port         = 80
-        protocol        = "tcp"
-        security_groups = [aws_security_group.security_group_alb.id]
+    dynamic "ingress" {
+        for_each = local.is_django ? [] : [1]
+        content {
+            description     = "Trafic HTTP from ALB"
+            from_port       = 80
+            to_port         = 80
+            protocol        = "tcp"
+            security_groups = [aws_security_group.security_group_alb.id]
+        }
+    }
+
+    dynamic "ingress" {
+        for_each = local.is_django ? [1] : []
+        content {
+            description     = "Trafic Django (Gunicorn) from ALB"
+            from_port       = 8000
+            to_port         = 8000
+            protocol        = "tcp"
+            security_groups = [aws_security_group.security_group_alb.id]
+        }
     }
 
     ingress {
@@ -129,7 +145,7 @@ resource "aws_lb" "load_balancer" {
 
 resource "aws_lb_target_group" "target_group" {
     name        = "${var.name_load_balancer}-tg"
-    port        = 80
+    port        = local.app_port
     protocol    = "HTTP"
     target_type = "ip"
     vpc_id      = var.vpc_id
