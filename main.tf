@@ -157,6 +157,7 @@ resource "aws_lb_target_group" "target_group" {
     protocol    = "HTTP"
     target_type = "ip"
     vpc_id      = var.vpc_id
+    load_balancing_algorithm_type = var.load_balancing_algorithm_type
 
     health_check {
         path              = "/healthcheck"

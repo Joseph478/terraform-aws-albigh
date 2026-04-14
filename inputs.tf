@@ -56,6 +56,17 @@ variable "launch_type" {
     }
 }
 
+variable "load_balancing_algorithm_type" {
+    default     = "least_outstanding_requests"
+    description = "Load balancing algorithm for the target group. Allowed values: 'round_robin', 'least_outstanding_requests', 'weighted_random'"
+    type        = string
+
+    validation {
+        condition     = contains(["round_robin", "least_outstanding_requests", "weighted_random"], var.load_balancing_algorithm_type)
+        error_message = "load_balancing_algorithm_type must be 'round_robin', 'least_outstanding_requests', or 'weighted_random'."
+    }
+}
+
 variable "type_project" {
     default     = "laravel"
     description = "Project type. Defines container port and target group port. Allowed values: 'laravel' (port 80), 'django' (port 8000)"
