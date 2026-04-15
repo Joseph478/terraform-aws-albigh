@@ -274,9 +274,9 @@ resource "aws_launch_template" "template" {
 resource "aws_autoscaling_group" "autoscaling_group" {
     count               = local.is_ec2 ? 1 : 0
     vpc_zone_identifier = var.subnets
-    desired_capacity    = 2
-    max_size            = 4
-    min_size            = 2
+    desired_capacity    = var.asg_desired_capacity
+    max_size            = var.asg_max_size
+    min_size            = var.asg_min_size
     force_delete        = true
 
     launch_template {

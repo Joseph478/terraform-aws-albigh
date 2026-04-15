@@ -56,6 +56,24 @@ variable "launch_type" {
     }
 }
 
+variable "asg_desired_capacity" {
+    default     = 2
+    description = "Desired number of EC2 instances in the Auto Scaling Group. Only used when launch_type = 'EC2'"
+    type        = number
+}
+
+variable "asg_min_size" {
+    default     = 2
+    description = "Minimum number of EC2 instances in the Auto Scaling Group. Only used when launch_type = 'EC2'"
+    type        = number
+}
+
+variable "asg_max_size" {
+    default     = 4
+    description = "Maximum number of EC2 instances in the Auto Scaling Group. Only used when launch_type = 'EC2'"
+    type        = number
+}
+
 variable "load_balancing_algorithm_type" {
     default     = "least_outstanding_requests"
     description = "Load balancing algorithm for the target group. Allowed values: 'round_robin', 'least_outstanding_requests', 'weighted_random'"
