@@ -1,13 +1,15 @@
 locals {
-    is_ec2    = var.launch_type == "EC2"
-    is_django = var.type_project == "django"
-    app_port  = local.is_django ? 8000 : 80
+    is_ec2        = var.launch_type == "EC2"
+    is_django     = var.type_project == "django"
+    app_port      = local.is_django ? 8000 : 80
+    create_bucket = var.bucket_name != null
 }
 
 # ─── S3 para logs del ALB ────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "bucket" {
-    bucket = "bucket${var.name_main}"
+    count  = local.create_bucket ? 1 : 0
+    bucket = var.bucket_name
 
     tags = {
         Name    = "Bucket${var.name_main}terraform"
@@ -17,36 +19,42 @@ resource "aws_s3_bucket" "bucket" {
 }
 
 resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
-    bucket = aws_s3_bucket.bucket.id
+    count  = local.create_bucket ? 1 : 0
+    bucket = aws_s3_bucket.bucket[0].id
     rule {
         object_ownership = "BucketOwnerPreferred"
     }
 }
 
 resource "aws_s3_bucket_acl" "s3_bucket_acl" {
+    count      = local.create_bucket ? 1 : 0
     depends_on = [aws_s3_bucket_ownership_controls.ownership_controls]
-    bucket     = aws_s3_bucket.bucket.id
+    bucket     = aws_s3_bucket.bucket[0].id
     acl        = "private"
 }
 
 # Permisos para ELB
-data "aws_elb_service_account" "main" {}
+data "aws_elb_service_account" "main" {
+    count = local.create_bucket ? 1 : 0
+}
 
 data "aws_iam_policy_document" "logs_document" {
+    count = local.create_bucket ? 1 : 0
     statement {
         actions   = ["s3:PutObject"]
-        resources = ["arn:aws:s3:::${aws_s3_bucket.bucket.id}/*"]
+        resources = ["arn:aws:s3:::${aws_s3_bucket.bucket[0].id}/*"]
 
         principals {
             type        = "AWS"
-            identifiers = [data.aws_elb_service_account.main.id]
+            identifiers = [data.aws_elb_service_account.main[0].id]
         }
     }
 }
 
 resource "aws_s3_bucket_policy" "logs_policy" {
-    bucket = aws_s3_bucket.bucket.id
-    policy = data.aws_iam_policy_document.logs_document.json
+    count  = local.create_bucket ? 1 : 0
+    bucket = aws_s3_bucket.bucket[0].id
+    policy = data.aws_iam_policy_document.logs_document[0].json
 }
 
 # ─── Security Groups ─────────────────────────────────────────────────────────

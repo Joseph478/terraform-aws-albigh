@@ -95,3 +95,9 @@ variable "type_project" {
         error_message = "type_project must be 'laravel' or 'django'."
     }
 }
+
+variable "bucket_name" {
+    default     = null
+    description = "Name of the S3 bucket for ALB access logs. If not provided, no bucket or related resources are created."
+    type        = string
+}
