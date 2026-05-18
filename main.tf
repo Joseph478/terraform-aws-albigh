@@ -11,11 +11,11 @@ resource "aws_s3_bucket" "bucket" {
     count  = local.create_bucket ? 1 : 0
     bucket = var.bucket_name
 
-    tags = {
+    tags = merge(var.tags, {
         Name    = "Bucket${var.name_main}terraform"
         ENV     = "PROD"
         SERVICE = upper(var.name_main)
-    }
+    })
 }
 
 resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
@@ -88,9 +88,9 @@ resource "aws_security_group" "security_group_alb" {
         ipv6_cidr_blocks = ["::/0"]
     }
 
-    tags = {
-        Name = "security_group_alb"
-    }
+    tags = merge(var.tags, {
+        Name = "security_group_alb_${var.name_main}"
+    })
 }
 
 # Security group para instancias EC2 (launch_type = EC2) o tareas Fargate (launch_type = FARGATE)
@@ -137,9 +137,9 @@ resource "aws_security_group" "security_group_ec2" {
         ipv6_cidr_blocks = ["::/0"]
     }
 
-    tags = {
+    tags = merge(var.tags, {
         Name = local.is_ec2 ? "security_group_ec2" : "security_group_fargate"
-    }
+    })
 }
 
 # ─── ALB ─────────────────────────────────────────────────────────────────────
@@ -153,10 +153,10 @@ resource "aws_lb" "load_balancer" {
     enable_waf_fail_open       = false
     enable_deletion_protection = false
 
-    tags = {
+    tags = merge(var.tags, {
         ENV     = "PROD"
         SERVICE = "MMG"
-    }
+    })
 }
 
 resource "aws_lb_target_group" "target_group" {
@@ -171,6 +171,8 @@ resource "aws_lb_target_group" "target_group" {
         path              = "/healthcheck"
         healthy_threshold = 2
     }
+
+    tags = var.tags
 }
 
 resource "aws_lb_listener" "listener_default_secure" {
@@ -184,6 +186,8 @@ resource "aws_lb_listener" "listener_default_secure" {
         type             = "forward"
         target_group_arn = aws_lb_target_group.target_group.arn
     }
+
+    tags = var.tags
 }
 
 resource "aws_lb_listener" "listener_default" {
@@ -200,6 +204,8 @@ resource "aws_lb_listener" "listener_default" {
             status_code = "HTTP_301"
         }
     }
+
+    tags = var.tags
 }
 
 resource "aws_wafv2_web_acl_association" "web_acl_association" {
@@ -266,10 +272,12 @@ resource "aws_launch_template" "template" {
 
     tag_specifications {
         resource_type = "instance"
-        tags = {
+        tags = merge(var.tags, {
             Name = "Template${var.name_main}"
-        }
+        })
     }
+
+    tags = var.tags
 
     user_data = base64encode(<<-EOF
                     #!/bin/bash
@@ -306,10 +314,13 @@ resource "aws_autoscaling_group" "autoscaling_group" {
         "GroupTotalInstances",
     ]
 
-    tag {
-        key                 = "AmazonECSManaged"
-        value               = true
-        propagate_at_launch = true
+    dynamic "tag" {
+        for_each = merge(var.tags, { AmazonECSManaged = "true" })
+        content {
+            key                 = tag.key
+            value               = tag.value
+            propagate_at_launch = true
+        }
     }
 }
 
@@ -359,6 +370,8 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
     }
 
     alarm_actions = [aws_autoscaling_policy.scale_up[0].arn]
+
+    tags = var.tags
 }
 
 resource "aws_cloudwatch_metric_alarm" "cpu_low" {
@@ -378,6 +391,8 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
     }
 
     alarm_actions = [aws_autoscaling_policy.scale_down[0].arn]
+
+    tags = var.tags
 }
 
 # Alarmas por Memory
@@ -398,6 +413,8 @@ resource "aws_cloudwatch_metric_alarm" "memory_high" {
     }
 
     alarm_actions = [aws_autoscaling_policy.scale_up[0].arn]
+
+    tags = var.tags
 }
 
 resource "aws_cloudwatch_metric_alarm" "memory_low" {
@@ -417,6 +434,8 @@ resource "aws_cloudwatch_metric_alarm" "memory_low" {
     }
 
     alarm_actions = [aws_autoscaling_policy.scale_down[0].arn]
+
+    tags = var.tags
 }
 
 resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
@@ -435,4 +454,6 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
             target_capacity           = 10
         }
     }
+
+    tags = var.tags
 }

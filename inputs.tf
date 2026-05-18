@@ -101,3 +101,9 @@ variable "bucket_name" {
     description = "Name of the S3 bucket for ALB access logs. If not provided, no bucket or related resources are created."
     type        = string
 }
+
+variable "tags" {
+    description = "A map of tags to assign to all resources"
+    type        = map(string)
+    default     = {}
+}
