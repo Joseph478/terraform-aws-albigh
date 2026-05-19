@@ -107,3 +107,21 @@ variable "tags" {
     type        = map(string)
     default     = {}
 }
+
+variable "hc_timeout" {
+    default     = 15
+    description = "Health check timeout in seconds for the target group"
+    type        = number
+}
+
+variable "hc_unhealthy_threshold" {
+    default     = 6
+    description = "Number of consecutive health check failures before marking a target as unhealthy"
+    type        = number
+}
+
+variable "hc_healthy_threshold" {
+    default     = 2
+    description = "Number of consecutive successful health checks before marking a target as healthy"
+    type        = number
+}

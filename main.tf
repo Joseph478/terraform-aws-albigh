@@ -168,8 +168,10 @@ resource "aws_lb_target_group" "target_group" {
     load_balancing_algorithm_type = var.load_balancing_algorithm_type
 
     health_check {
-        path              = "/healthcheck"
-        healthy_threshold = 2
+        path                = "/healthcheck"
+        timeout             = var.hc_timeout
+        healthy_threshold   = var.hc_healthy_threshold
+        unhealthy_threshold = var.hc_unhealthy_threshold
     }
 
     tags = var.tags
