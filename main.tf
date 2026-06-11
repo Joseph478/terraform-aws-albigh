@@ -500,7 +500,7 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
             maximum_scaling_step_size = 1000
             minimum_scaling_step_size = 1
             status                    = "ENABLED"
-            target_capacity           = 10
+            target_capacity           = 100
         }
     }
 
@@ -508,5 +508,18 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 
     lifecycle {
         ignore_changes = [tags["ORDEN"], tags["Name"]]
+    }
+}
+
+resource "aws_ecs_cluster_capacity_providers" "this" {
+    count        = local.is_ec2 ? 1 : 0
+    cluster_name = var.name_cluster_ecs
+
+    capacity_providers = [aws_ecs_capacity_provider.ecs_capacity_provider[0].name]
+
+    default_capacity_provider_strategy {
+        base              = 1
+        weight            = 100
+        capacity_provider = aws_ecs_capacity_provider.ecs_capacity_provider[0].name
     }
 }
