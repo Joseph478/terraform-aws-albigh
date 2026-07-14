@@ -42,7 +42,31 @@ variable "role_ec2" {
     type        = string
 }
 variable "name_cluster_ecs" {
-    description = "Name of the cluster"
+    default     = null
+    description = "Name of the ECS cluster. Required when ecs_connect is true."
+    type        = string
+}
+
+variable "ecs_connect" {
+    default     = true
+    description = "When true, creates the ECS capacity provider and associates the Auto Scaling Group with the ECS cluster. When false, only creates ALB and EC2/ASG resources."
+    type        = bool
+
+    validation {
+        condition     = !var.ecs_connect || var.name_cluster_ecs != null
+        error_message = "name_cluster_ecs is required when ecs_connect is true."
+    }
+}
+
+variable "user_data" {
+    default     = null
+    description = "Custom bash script for EC2 instances in the Auto Scaling Group. Takes precedence over user_data_file."
+    type        = string
+}
+
+variable "user_data_file" {
+    default     = null
+    description = "Path to an external bash script file for EC2 instances. Used when user_data is not provided."
     type        = string
 }
 variable "launch_type" {

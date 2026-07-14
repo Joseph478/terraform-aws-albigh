@@ -7,6 +7,18 @@ locals {
         ENV     = "PROD"
         SERVICE = upper(var.name_main)
     })
+
+    default_ecs_user_data = <<-EOF
+        #!/bin/bash
+        echo ECS_CLUSTER=${var.name_cluster_ecs} >> /etc/ecs/ecs.config
+        echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
+    EOF
+
+    user_data_script = (
+        var.user_data != null ? var.user_data :
+        var.user_data_file != null ? file(var.user_data_file) :
+        var.ecs_connect ? local.default_ecs_user_data : null
+    )
 }
 
 # ─── S3 para logs del ALB ────────────────────────────────────────────────────
@@ -312,12 +324,7 @@ resource "aws_launch_template" "template" {
         ignore_changes = [tags["ORDEN"], tags["Name"]]
     }
 
-    user_data = base64encode(<<-EOF
-                    #!/bin/bash
-                    echo ECS_CLUSTER=${var.name_cluster_ecs} >> /etc/ecs/ecs.config
-                    echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
-                  EOF
-    )
+    user_data = local.user_data_script != null ? base64encode(local.user_data_script) : null
 }
 
 resource "aws_autoscaling_group" "autoscaling_group" {
@@ -348,7 +355,7 @@ resource "aws_autoscaling_group" "autoscaling_group" {
     ]
 
     dynamic "tag" {
-        for_each = merge(local.common_tags, { AmazonECSManaged = "true" })
+        for_each = merge(local.common_tags, var.ecs_connect ? { AmazonECSManaged = "true" } : {})
         content {
             key                 = tag.key
             value               = tag.value
@@ -488,7 +495,7 @@ resource "aws_cloudwatch_metric_alarm" "memory_low" {
 }
 
 resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
-    count = local.is_ec2 ? 1 : 0
+    count = local.is_ec2 && var.ecs_connect ? 1 : 0
     name  = "capacity-provider-${var.name_main}"
 
     auto_scaling_group_provider {
@@ -512,7 +519,7 @@ resource "aws_ecs_capacity_provider" "ecs_capacity_provider" {
 }
 
 resource "aws_ecs_cluster_capacity_providers" "this" {
-    count        = local.is_ec2 ? 1 : 0
+    count        = local.is_ec2 && var.ecs_connect ? 1 : 0
     cluster_name = var.name_cluster_ecs
 
     capacity_providers = [aws_ecs_capacity_provider.ecs_capacity_provider[0].name]
