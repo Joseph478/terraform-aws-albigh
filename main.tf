@@ -51,6 +51,16 @@ resource "aws_s3_bucket_acl" "s3_bucket_acl" {
     acl        = "private"
 }
 
+resource "aws_s3_bucket_public_access_block" "public_access_block" {
+    count  = local.create_bucket ? 1 : 0
+    bucket = aws_s3_bucket.bucket[0].id
+
+    block_public_acls       = true
+    block_public_policy     = true
+    ignore_public_acls      = true
+    restrict_public_buckets = true
+}
+
 # Permisos para ELB
 data "aws_elb_service_account" "main" {
     count = local.create_bucket ? 1 : 0
@@ -185,7 +195,15 @@ resource "aws_lb" "load_balancer" {
     security_groups            = [aws_security_group.security_group_alb.id]
     subnets                    = var.subnets
     enable_waf_fail_open       = false
-    enable_deletion_protection = false
+    enable_deletion_protection = true
+
+    dynamic "access_logs" {
+        for_each = local.create_bucket ? [1] : []
+        content {
+            bucket  = aws_s3_bucket.bucket[0].id
+            enabled = true
+        }
+    }
 
     tags = local.common_tags
 
@@ -220,7 +238,7 @@ resource "aws_lb_listener" "listener_default_secure" {
     load_balancer_arn = aws_lb.load_balancer.arn
     port              = "443"
     protocol          = "HTTPS"
-    ssl_policy        = "ELBSecurityPolicy-2016-08"
+    ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
     certificate_arn   = var.certificate_arn
 
     default_action {
@@ -311,7 +329,7 @@ resource "aws_launch_template" "template" {
     }
 
     network_interfaces {
-        associate_public_ip_address = true
+        associate_public_ip_address = false
         security_groups             = [aws_security_group.security_group_ec2.id]
     }
 
