@@ -24,6 +24,7 @@ variable "subnets" {
     type = list(string)
 }
 variable "private_subnets" {
+    default = null
     description = "Private Subnets of VPC"
     type = list(string)
 }
