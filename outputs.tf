@@ -41,11 +41,11 @@ output "arn_listener_http" {
 }
 
 output "id_s3_bucket" {
-    value = try(aws_s3_bucket.bucket[0].id, null)
+    value = local.bucket_id
 }
 
 output "arn_s3_bucket" {
-    value = try(aws_s3_bucket.bucket[0].arn, null)
+    value = local.bucket_arn
 }
 
 output "id_launch_template" {

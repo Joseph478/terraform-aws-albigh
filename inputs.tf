@@ -127,6 +127,12 @@ variable "bucket_name" {
     type        = string
 }
 
+variable "bucket_exists" {
+    default     = false
+    description = "Set to true when bucket_name refers to an S3 bucket that already exists. The module will adopt/update it (ownership controls, ACL, public access block, policy) instead of trying to create it. Ignored when bucket_name is null."
+    type        = bool
+}
+
 variable "tags" {
     description = "A map of tags to assign to all resources"
     type        = map(string)

@@ -3,6 +3,12 @@ locals {
     is_django     = var.type_project == "django"
     app_port      = local.is_django ? 8000 : 80
     create_bucket = var.bucket_name != null
+    adopt_bucket  = local.create_bucket && var.bucket_exists
+    new_bucket    = local.create_bucket && !var.bucket_exists
+
+    bucket_id  = local.adopt_bucket ? try(data.aws_s3_bucket.existing[0].id, null) : try(aws_s3_bucket.bucket[0].id, null)
+    bucket_arn = local.adopt_bucket ? try(data.aws_s3_bucket.existing[0].arn, null) : try(aws_s3_bucket.bucket[0].arn, null)
+
     common_tags   = merge(var.tags, {
         ENV     = "PROD"
         SERVICE = upper(var.name_main)
@@ -24,7 +30,7 @@ locals {
 # ─── S3 para logs del ALB ────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "bucket" {
-    count  = local.create_bucket ? 1 : 0
+    count  = local.new_bucket ? 1 : 0
     bucket = var.bucket_name
 
     tags = merge(local.common_tags, {
@@ -32,13 +38,23 @@ resource "aws_s3_bucket" "bucket" {
     })
 
     lifecycle {
-        ignore_changes = [tags["ORDEN"], tags["Name"]]
+        ignore_changes  = [tags["ORDEN"], tags["Name"]]
+        # Nunca destruir el bucket, ni siquiera con `terraform destroy`.
+        # Para borrarlo de verdad hay que quitarlo del state manualmente.
+        prevent_destroy = true
     }
+}
+
+# Referencia de solo lectura a un bucket ya existente (bucket_exists = true).
+# No lo crea ni lo destruye; los recursos de abajo lo actualizan/administran.
+data "aws_s3_bucket" "existing" {
+    count  = local.adopt_bucket ? 1 : 0
+    bucket = var.bucket_name
 }
 
 resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
     count  = local.create_bucket ? 1 : 0
-    bucket = aws_s3_bucket.bucket[0].id
+    bucket = local.bucket_id
     rule {
         object_ownership = "BucketOwnerPreferred"
     }
@@ -47,13 +63,13 @@ resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
 resource "aws_s3_bucket_acl" "s3_bucket_acl" {
     count      = local.create_bucket ? 1 : 0
     depends_on = [aws_s3_bucket_ownership_controls.ownership_controls]
-    bucket     = aws_s3_bucket.bucket[0].id
+    bucket     = local.bucket_id
     acl        = "private"
 }
 
 resource "aws_s3_bucket_public_access_block" "public_access_block" {
     count  = local.create_bucket ? 1 : 0
-    bucket = aws_s3_bucket.bucket[0].id
+    bucket = local.bucket_id
 
     block_public_acls       = true
     block_public_policy     = true
@@ -70,7 +86,7 @@ data "aws_iam_policy_document" "logs_document" {
     count = local.create_bucket ? 1 : 0
     statement {
         actions   = ["s3:PutObject"]
-        resources = ["arn:aws:s3:::${aws_s3_bucket.bucket[0].id}/*"]
+        resources = ["${local.bucket_arn}/*"]
 
         principals {
             type        = "AWS"
@@ -81,7 +97,7 @@ data "aws_iam_policy_document" "logs_document" {
 
 resource "aws_s3_bucket_policy" "logs_policy" {
     count  = local.create_bucket ? 1 : 0
-    bucket = aws_s3_bucket.bucket[0].id
+    bucket = local.bucket_id
     policy = data.aws_iam_policy_document.logs_document[0].json
 }
 
@@ -200,7 +216,7 @@ resource "aws_lb" "load_balancer" {
     dynamic "access_logs" {
         for_each = local.create_bucket ? [1] : []
         content {
-            bucket  = aws_s3_bucket.bucket[0].id
+            bucket  = local.bucket_id
             enabled = true
         }
     }
