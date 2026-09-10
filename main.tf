@@ -1,13 +1,16 @@
 locals {
-    is_ec2        = var.launch_type == "EC2"
-    is_django     = var.type_project == "django"
-    app_port      = local.is_django ? 8000 : 80
-    create_bucket = var.bucket_name != null
-    adopt_bucket  = local.create_bucket && var.bucket_exists
-    new_bucket    = local.create_bucket && !var.bucket_exists
+    is_ec2    = var.launch_type == "EC2"
+    is_django = var.type_project == "django"
+    app_port  = local.is_django ? 8000 : 80
 
-    bucket_id  = local.adopt_bucket ? try(data.aws_s3_bucket.existing[0].id, null) : try(aws_s3_bucket.bucket[0].id, null)
-    bucket_arn = local.adopt_bucket ? try(data.aws_s3_bucket.existing[0].arn, null) : try(aws_s3_bucket.bucket[0].arn, null)
+    default_bucket_name_log = "alb-logs-${replace(lower(var.name_main), "_", "-")}-${var.account_id}"
+    bucket_name_log         = coalesce(var.bucket_name_log, local.default_bucket_name_log)
+
+    adopt_bucket = var.bucket_exists
+    new_bucket   = !var.bucket_exists
+
+    bucket_id  = local.adopt_bucket ? data.aws_s3_bucket.existing[0].id : aws_s3_bucket.bucket[0].id
+    bucket_arn = local.adopt_bucket ? data.aws_s3_bucket.existing[0].arn : aws_s3_bucket.bucket[0].arn
 
     common_tags   = merge(var.tags, {
         ENV     = "PROD"
@@ -30,18 +33,17 @@ locals {
 # ─── S3 para logs del ALB ────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "bucket" {
-    count  = local.new_bucket ? 1 : 0
-    bucket = var.bucket_name
+    count         = local.new_bucket ? 1 : 0
+    bucket        = local.bucket_name_log
+    force_destroy = true
 
     tags = merge(local.common_tags, {
-        Name = "Bucket${var.name_main}terraform"
+        Name = "BucketLogs${var.name_main}terraform"
     })
 
     lifecycle {
         ignore_changes  = [tags["ORDEN"], tags["Name"]]
-        # Nunca destruir el bucket, ni siquiera con `terraform destroy`.
-        # Para borrarlo de verdad hay que quitarlo del state manualmente.
-        prevent_destroy = true
+        prevent_destroy = false
     }
 }
 
@@ -49,11 +51,10 @@ resource "aws_s3_bucket" "bucket" {
 # No lo crea ni lo destruye; los recursos de abajo lo actualizan/administran.
 data "aws_s3_bucket" "existing" {
     count  = local.adopt_bucket ? 1 : 0
-    bucket = var.bucket_name
+    bucket = local.bucket_name_log
 }
 
 resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
-    count  = local.create_bucket ? 1 : 0
     bucket = local.bucket_id
     rule {
         object_ownership = "BucketOwnerPreferred"
@@ -61,14 +62,12 @@ resource "aws_s3_bucket_ownership_controls" "ownership_controls" {
 }
 
 resource "aws_s3_bucket_acl" "s3_bucket_acl" {
-    count      = local.create_bucket ? 1 : 0
     depends_on = [aws_s3_bucket_ownership_controls.ownership_controls]
     bucket     = local.bucket_id
     acl        = "private"
 }
 
 resource "aws_s3_bucket_public_access_block" "public_access_block" {
-    count  = local.create_bucket ? 1 : 0
     bucket = local.bucket_id
 
     block_public_acls       = true
@@ -77,28 +76,31 @@ resource "aws_s3_bucket_public_access_block" "public_access_block" {
     restrict_public_buckets = true
 }
 
-# Permisos para ELB
-data "aws_elb_service_account" "main" {
-    count = local.create_bucket ? 1 : 0
+resource "aws_s3_bucket_versioning" "versioning" {
+    bucket = local.bucket_id
+    versioning_configuration {
+        status = "Enabled"
+    }
 }
 
+# Permisos para ELB
+data "aws_elb_service_account" "main" {}
+
 data "aws_iam_policy_document" "logs_document" {
-    count = local.create_bucket ? 1 : 0
     statement {
         actions   = ["s3:PutObject"]
         resources = ["${local.bucket_arn}/*"]
 
         principals {
             type        = "AWS"
-            identifiers = [data.aws_elb_service_account.main[0].id]
+            identifiers = [data.aws_elb_service_account.main.id]
         }
     }
 }
 
 resource "aws_s3_bucket_policy" "logs_policy" {
-    count  = local.create_bucket ? 1 : 0
     bucket = local.bucket_id
-    policy = data.aws_iam_policy_document.logs_document[0].json
+    policy = data.aws_iam_policy_document.logs_document.json
 }
 
 # ─── Security Groups ─────────────────────────────────────────────────────────
@@ -213,12 +215,9 @@ resource "aws_lb" "load_balancer" {
     enable_waf_fail_open       = false
     enable_deletion_protection = true
 
-    dynamic "access_logs" {
-        for_each = local.create_bucket ? [1] : []
-        content {
-            bucket  = local.bucket_id
-            enabled = true
-        }
+    access_logs {
+        bucket  = local.bucket_id
+        enabled = true
     }
 
     tags = local.common_tags

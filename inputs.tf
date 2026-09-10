@@ -121,15 +121,15 @@ variable "type_project" {
     }
 }
 
-variable "bucket_name" {
+variable "bucket_name_log" {
     default     = null
-    description = "Name of the S3 bucket for ALB access logs. If not provided, no bucket or related resources are created."
+    description = "Name of the S3 bucket for ALB access logs. If not provided, a default name is generated using name_main and account_id. This bucket is exclusively for ALB access logs: it is versioned (to protect logs on buckets that may already be in use) and can still be destroyed normally (force_destroy = true)."
     type        = string
 }
 
 variable "bucket_exists" {
     default     = false
-    description = "Set to true when bucket_name refers to an S3 bucket that already exists. The module will adopt/update it (ownership controls, ACL, public access block, policy) instead of trying to create it. Ignored when bucket_name is null."
+    description = "Set to true when bucket_name_log refers to an S3 bucket that already exists. The module will adopt/update it (ownership controls, ACL, public access block, policy) instead of creating a new one."
     type        = bool
 }
 
