@@ -211,7 +211,7 @@ resource "aws_lb" "load_balancer" {
     internal                   = false
     load_balancer_type         = "application"
     security_groups            = [aws_security_group.security_group_alb.id]
-    subnets                    = var.subnets
+    subnets                    = var.public_subnets
     enable_waf_fail_open       = false
     enable_deletion_protection = true
 
@@ -370,7 +370,7 @@ resource "aws_launch_template" "template" {
 
 resource "aws_autoscaling_group" "autoscaling_group" {
     count               = local.is_ec2 ? 1 : 0
-    vpc_zone_identifier = var.subnets
+    vpc_zone_identifier = var.private_subnets
     desired_capacity    = var.asg_desired_capacity
     max_size            = var.asg_max_size
     min_size            = var.asg_min_size
