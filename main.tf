@@ -343,6 +343,12 @@ resource "aws_launch_template" "template" {
         enabled = true
     }
 
+    metadata_options {
+        http_endpoint               = "enabled"
+        http_tokens                 = "required"
+        http_put_response_hop_limit = 2
+    }
+
     network_interfaces {
         associate_public_ip_address = false
         security_groups             = [aws_security_group.security_group_ec2.id]
